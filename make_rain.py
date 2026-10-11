@@ -139,19 +139,44 @@ def render(created, values):
     d.text((right, 131), "+2 UUR", font=font(17), fill=muted, anchor="ra")
     img.save(OUT / "rain.png", optimize=True)
 
-def rain_text(values):
-    """Twaalf blokjes van elk circa tien minuten, uit KNMI-waarden."""
-    levels = "▁▂▃▄▅▆▇█"
-    buckets = []
-    for i in range(0, min(24, len(values)), 2):
-        samples = [mm for _, mm in values[i:i + 2] if mm is not None]
-        buckets.append(max(samples) if samples else None)
-    finite = [v for v in buckets if v is not None]
-    if not finite:
-        return "Geen KNMI-data"
-    scale = max(1.0, max(finite))
-    bars = "".join("?" if v is None else "·" if v <= 0 else levels[min(7, max(0, round(v / scale * 7)))] for v in buckets)
-    return f"NU {bars} +2u"
+def rain_text(values, created):
+    """24 regenposities van elk 5 minuten, met begintijd erboven."""
+    from datetime import datetime, timedelta
+
+    now = datetime.now(created.tzinfo)
+    elapsed = max(0, int((now - created).total_seconds() // 300))
+
+    future = list(values[elapsed:elapsed + 24])
+    future += [None] * (24 - len(future))
+
+    def symbol(mm):
+        if mm is None:
+            return "·"
+        mm_per_hour = max(0, mm) * 12
+        if mm_per_hour < 0.1:
+            return "•"
+        levels = "▁▂▃▄▅▆▇█"
+        thresholds = [0.5, 1, 2, 4, 6, 10, 20]
+        level = sum(mm_per_hour >= t for t in thresholds)
+        return levels[level]
+
+    bars = "".join(symbol(mm) for mm in future)
+
+    first_rain = next(
+        (i for i, mm in enumerate(future)
+         if mm is not None and mm * 12 >= 0.1),
+        None
+    )
+
+    if first_rain is not None:
+        starts = created + timedelta(minutes=5 * (elapsed + first_rain))
+        title = "Regen " + starts.astimezone(TZ).strftime("%H:%M")
+    elif any(mm is not None for mm in future):
+        title = "Droog"
+    else:
+        title = "Geen gegevens"
+
+    return title + "\n" + bars
 
 def main():
     created, values = fetch_values()
@@ -162,7 +187,7 @@ def main():
     url = f"https://lighthub-2027.github.io/-knmi-watch/rain.png?v={stamp}"
     payload = {
         "image_url": url,
-        "regenbalkjes": rain_text(values),
+        "regenbalkjes": rain_text(values, created),
         "location": "Vlambloemlaan, Vleuterweide",
         "source": "KNMI radar_forecast/2.0",
         "updated_at": created.isoformat(),
