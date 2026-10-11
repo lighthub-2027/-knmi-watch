@@ -146,7 +146,7 @@ def rain_text(values, created):
     now = datetime.now(created.tzinfo)
     elapsed = max(0, int((now - created).total_seconds() // 300))
 
-    future = list(values[elapsed:elapsed + 24])
+        future = [mm for _, mm in values[elapsed:elapsed + 24]]
     future += [None] * (24 - len(future))
 
     def symbol(mm):
