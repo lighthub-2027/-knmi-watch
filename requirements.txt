@@ -1,0 +1,4 @@
+requests>=2.31,<3
+h5py>=3.11,<4
+pyproj>=3.6,<4
+Pillow>=10,<13
