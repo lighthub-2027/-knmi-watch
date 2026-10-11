@@ -5,15 +5,89 @@ on:
   workflow_dispatch:
 
 jobs:
-  controle:
+  onderzoek:
     runs-on: ubuntu-latest
     steps:
-      - name: Test KNMI regenverwachting
+      - name: Python voorbereiden
+        run: pip install requests h5py
+
+      - name: Nieuwste KNMI-radarbestand onderzoeken
         env:
           KNMI_API_KEY: ${{ secrets.KNMI_API_KEY }}
         run: |
-          curl --fail --silent --show-error \
-            --header "Authorization: $KNMI_API_KEY" \
-            "https://api.dataplatform.knmi.nl/open-data/v1/datasets/radar_forecast/versions/2.0/files?maxKeys=5&orderBy=created&sorting=desc"
+          python - <<'PY'
+          import os
+          import requests
+          import h5py
+          from datetime import datetime, timezone
 
-          echo "KNMI regenverwachting bereikbaar"
+          base = (
+              "https://api.dataplatform.knmi.nl/open-data/v1"
+              "/datasets/radar_forecast/versions/2.0/files"
+          )
+          headers = {"Authorization": os.environ["KNMI_API_KEY"]}
+
+          response = requests.get(
+              base,
+              headers=headers,
+              params={
+                  "maxKeys": 1,
+                  "orderBy": "created",
+                  "sorting": "desc"
+              },
+              timeout=30
+          )
+          response.raise_for_status()
+          file_info = response.json()["files"][0]
+          filename = file_info["filename"]
+
+          created = datetime.fromisoformat(file_info["created"])
+          age = datetime.now(timezone.utc) - created
+
+          print("Bestand:", filename, flush=True)
+          print("Leeftijd in minuten:",
+                round(age.total_seconds() / 60), flush=True)
+
+          if age.total_seconds() > 3600:
+              raise RuntimeError(
+                  "KNMI-bestand is ouder dan een uur."
+              )
+
+          response = requests.get(
+              f"{base}/{filename}/url",
+              headers=headers,
+              timeout=30
+          )
+          response.raise_for_status()
+          download_url = response.json()["temporaryDownloadUrl"]
+
+          response = requests.get(download_url, timeout=60)
+          response.raise_for_status()
+
+          with open("radar.h5", "wb") as file:
+              file.write(response.content)
+
+          print("Download voltooid.", flush=True)
+
+          with h5py.File("radar.h5", "r") as radar:
+              print("Onderdelen van radarbestand:", flush=True)
+
+              count = [0]
+
+              def describe(name, obj):
+                  if count[0] >= 60:
+                      return
+                  if isinstance(obj, h5py.Dataset):
+                      print(
+                          "DATA:", name,
+                          "vorm:", obj.shape,
+                          "type:", obj.dtype
+                      )
+                  else:
+                      print("GROEP:", name)
+                  count[0] += 1
+
+              radar.visititems(describe)
+
+          print("Onderzoek voltooid.", flush=True)
+          PY
