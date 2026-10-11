@@ -175,7 +175,7 @@ def rain_text(values, created):
     else:
         title = "Geen gegevens"
 
-    return title + "\n" + bars
+        return bars[:18]
 
 def main():
     created, values = fetch_values()
