@@ -160,6 +160,7 @@ def rain_text(values, created):
         return levels[level]
 
     bars = "".join(symbol(mm) for mm in future)
+    return bars[:18]
 
     first_rain = next(
         (i for i, mm in enumerate(future)
@@ -174,8 +175,6 @@ def rain_text(values, created):
         title = "Droog"
     else:
         title = "Geen gegevens"
-
-        return bars[:18]
 
 def main():
     created, values = fetch_values()
