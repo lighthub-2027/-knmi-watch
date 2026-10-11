@@ -26,7 +26,7 @@ jobs:
       - name: Maak KNMI-grafiek
         env:
           KNMI_API_KEY: ${{ secrets.KNMI_API_KEY }}
-        run: python scripts/make_rain.py
+        run: python make_rain.py
       - name: Publiceer bijgewerkte grafiek
         run: |
           git config user.name "github-actions[bot]"
