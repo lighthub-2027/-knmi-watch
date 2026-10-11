@@ -1,0 +1,19 @@
+
+name: KNMI RegenGrafiek
+
+on:
+  workflow_dispatch:
+
+jobs:
+  controle:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Controleer KNMI sleutel
+        env:
+          KNMI_API_KEY: ${{ secrets.KNMI_API_KEY }}
+        run: |
+          if [ -z "$KNMI_API_KEY" ]; then
+            echo "KNMI sleutel ontbreekt"
+            exit 1
+          fi
+          echo "KNMI sleutel is ingesteld"
