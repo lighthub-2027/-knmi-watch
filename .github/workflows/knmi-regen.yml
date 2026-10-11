@@ -14,6 +14,6 @@ jobs:
         run: |
           curl --fail --silent --show-error \
             --header "Authorization: $KNMI_API_KEY" \
-            "https://api.dataplatform.knmi.nl/open-data/v1/datasets/radar_forecast/versions/2.0/files?maxKeys=5"
+            "https://api.dataplatform.knmi.nl/open-data/v1/datasets/radar_forecast/versions/2.0/files?maxKeys=5&orderBy=created&sorting=desc"
 
           echo "KNMI regenverwachting bereikbaar"
