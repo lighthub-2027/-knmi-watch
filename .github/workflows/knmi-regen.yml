@@ -8,18 +8,20 @@ jobs:
   onderzoek:
     runs-on: ubuntu-latest
     steps:
-      - name: Python voorbereiden
-        run: pip install requests h5py
+      - name: Benodigde software installeren
+        run: pip install requests h5py pyproj
 
-      - name: KNMI metadata onderzoeken
+      - name: Regenverwachting Vleuten uitlezen
         env:
           KNMI_API_KEY: ${{ secrets.KNMI_API_KEY }}
         run: |
           python - <<'PY'
           import os
+          import re
+          from datetime import datetime, timezone
           import requests
           import h5py
-          from datetime import datetime, timezone
+          from pyproj import Transformer
 
           base = (
               "https://api.dataplatform.knmi.nl/open-data/v1"
@@ -29,18 +31,22 @@ jobs:
 
           r = requests.get(
               base, headers=headers,
-              params={"maxKeys": 1, "orderBy": "created",
-                      "sorting": "desc"},
+              params={
+                  "maxKeys": 1,
+                  "orderBy": "created",
+                  "sorting": "desc"
+              },
               timeout=30
           )
           r.raise_for_status()
           info = r.json()["files"][0]
 
-          age = datetime.now(timezone.utc) - datetime.fromisoformat(
-              info["created"]
-          )
-          if age.total_seconds() > 3600:
-              raise RuntimeError("KNMI-bestand is te oud")
+          created = datetime.fromisoformat(info["created"])
+          age = (datetime.now(timezone.utc) - created).total_seconds()
+          if age < -300 or age > 3600:
+              raise RuntimeError("Geen recente KNMI-gegevens")
+
+          print("KNMI-bestand:", info["filename"])
 
           r = requests.get(
               f"{base}/{info['filename']}/url",
@@ -49,37 +55,100 @@ jobs:
           r.raise_for_status()
 
           r = requests.get(
-              r.json()["temporaryDownloadUrl"], timeout=60
+              r.json()["temporaryDownloadUrl"],
+              timeout=60
           )
           r.raise_for_status()
 
-          with open("radar.h5", "wb") as f:
-              f.write(r.content)
+          with open("radar.h5", "wb") as output:
+              output.write(r.content)
 
-          with h5py.File("radar.h5", "r") as f:
-              paths = [
-                  "/",
-                  "geographic",
-                  "geographic/map_projection",
-                  "image1",
-                  "image1/calibration",
-                  "image1/image_data",
-                  "image2",
-                  "image2/calibration",
-                  "image24",
-              ]
+          def scalar(value):
+              return value[0] if hasattr(value, "__len__") else value
 
-              for path in paths:
-                  if path != "/" and path not in f:
+          with h5py.File("radar.h5", "r") as radar:
+              geo = radar["geographic"]
+              proj = radar["geographic/map_projection"]
+              proj4 = proj.attrs["projection_proj4_params"].decode()
+
+              transformer = Transformer.from_crs(
+                  "EPSG:4326", proj4, always_xy=True
+              )
+
+              # Centrum van Vleuten, bij benadering
+              longitude = 5.013
+              latitude = 52.106
+
+              x, y = transformer.transform(longitude, latitude)
+
+              col_offset = float(scalar(
+                  geo.attrs["geo_column_offset"]
+              ))
+              row_offset = float(scalar(
+                  geo.attrs["geo_row_offset"]
+              ))
+              pixel_x = float(scalar(
+                  geo.attrs["geo_pixel_size_x"]
+              ))
+              pixel_y = float(scalar(
+                  geo.attrs["geo_pixel_size_y"]
+              ))
+
+              col = round((x - col_offset) / pixel_x)
+              row = round((y - row_offset) / pixel_y)
+
+              print("Vleuten rasterpositie:", row, col)
+
+              image_names = sorted(
+                  (key for key in radar.keys()
+                   if re.fullmatch(r"image\d+", key)),
+                  key=lambda key: int(key[5:])
+              )
+
+              print("Voorspelling Vleuten:")
+              for name in image_names:
+                  image = radar[name]
+                  data = image["image_data"]
+
+                  if not (0 <= row < data.shape[0]
+                          and 0 <= col < data.shape[1]):
+                      raise RuntimeError(
+                          "Vleuten valt buiten het radarraster"
+                      )
+
+                  raw = int(data[row, col])
+                  calibration = image["calibration"].attrs
+
+                  missing = int(scalar(
+                      calibration["calibration_missing_data"]
+                  ))
+                  outside = int(scalar(
+                      calibration["calibration_out_of_image"]
+                  ))
+
+                  timestamp = image.attrs[
+                      "image_datetime_valid"
+                  ].decode()
+
+                  if raw in (missing, outside):
+                      print(timestamp, "geen geldige waarde")
                       continue
 
-                  obj = f if path == "/" else f[path]
-                  print("\nONDERDEEL:", path, flush=True)
-
-                  for key, value in obj.attrs.items():
-                      print(
-                          "  ", key, "=",
-                          str(value)[:250],
-                          flush=True
+                  formula = calibration[
+                      "calibration_formulas"
+                  ].decode()
+                  match = re.search(
+                      r"GEO=([0-9.]+)\*PV\+([0-9.]+)",
+                      formula
+                  )
+                  if not match:
+                      raise RuntimeError(
+                          "Onbekende KNMI-kalibratie"
                       )
+
+                  millimeters = (
+                      float(match.group(1)) * raw
+                      + float(match.group(2))
+                  )
+                  print(timestamp, f"{millimeters:.2f} mm")
           PY
