@@ -95,7 +95,7 @@ jobs:
               ))
 
               col = round((x - col_offset) / pixel_x)
-              row = round((y - row_offset) / pixel_y)
+              row = round((-y - row_offset) / abs(pixel_y))
 
               print("Vleuten rasterpositie:", row, col)
 
