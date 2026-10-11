@@ -76,8 +76,8 @@ jobs:
               )
 
               # Centrum van Vleuten, bij benadering
-              longitude = 5.013
-              latitude = 52.106
+              longitude = 5.0019
+              latitude = 52.0975
 
               x, y = transformer.transform(longitude, latitude)
 
