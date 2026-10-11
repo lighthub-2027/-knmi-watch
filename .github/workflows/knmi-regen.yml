@@ -11,7 +11,7 @@ jobs:
       - name: Python voorbereiden
         run: pip install requests h5py
 
-      - name: Nieuwste KNMI-radarbestand onderzoeken
+      - name: KNMI metadata onderzoeken
         env:
           KNMI_API_KEY: ${{ secrets.KNMI_API_KEY }}
         run: |
@@ -27,67 +27,59 @@ jobs:
           )
           headers = {"Authorization": os.environ["KNMI_API_KEY"]}
 
-          response = requests.get(
-              base,
-              headers=headers,
-              params={
-                  "maxKeys": 1,
-                  "orderBy": "created",
-                  "sorting": "desc"
-              },
+          r = requests.get(
+              base, headers=headers,
+              params={"maxKeys": 1, "orderBy": "created",
+                      "sorting": "desc"},
               timeout=30
           )
-          response.raise_for_status()
-          file_info = response.json()["files"][0]
-          filename = file_info["filename"]
+          r.raise_for_status()
+          info = r.json()["files"][0]
 
-          created = datetime.fromisoformat(file_info["created"])
-          age = datetime.now(timezone.utc) - created
-
-          print("Bestand:", filename, flush=True)
-          print("Leeftijd in minuten:",
-                round(age.total_seconds() / 60), flush=True)
-
+          age = datetime.now(timezone.utc) - datetime.fromisoformat(
+              info["created"]
+          )
           if age.total_seconds() > 3600:
-              raise RuntimeError(
-                  "KNMI-bestand is ouder dan een uur."
-              )
+              raise RuntimeError("KNMI-bestand is te oud")
 
-          response = requests.get(
-              f"{base}/{filename}/url",
-              headers=headers,
-              timeout=30
+          r = requests.get(
+              f"{base}/{info['filename']}/url",
+              headers=headers, timeout=30
           )
-          response.raise_for_status()
-          download_url = response.json()["temporaryDownloadUrl"]
+          r.raise_for_status()
 
-          response = requests.get(download_url, timeout=60)
-          response.raise_for_status()
+          r = requests.get(
+              r.json()["temporaryDownloadUrl"], timeout=60
+          )
+          r.raise_for_status()
 
-          with open("radar.h5", "wb") as file:
-              file.write(response.content)
+          with open("radar.h5", "wb") as f:
+              f.write(r.content)
 
-          print("Download voltooid.", flush=True)
+          with h5py.File("radar.h5", "r") as f:
+              paths = [
+                  "/",
+                  "geographic",
+                  "geographic/map_projection",
+                  "image1",
+                  "image1/calibration",
+                  "image1/image_data",
+                  "image2",
+                  "image2/calibration",
+                  "image24",
+              ]
 
-          with h5py.File("radar.h5", "r") as radar:
-              print("Onderdelen van radarbestand:", flush=True)
+              for path in paths:
+                  if path != "/" and path not in f:
+                      continue
 
-              count = [0]
+                  obj = f if path == "/" else f[path]
+                  print("\nONDERDEEL:", path, flush=True)
 
-              def describe(name, obj):
-                  if count[0] >= 60:
-                      return
-                  if isinstance(obj, h5py.Dataset):
+                  for key, value in obj.attrs.items():
                       print(
-                          "DATA:", name,
-                          "vorm:", obj.shape,
-                          "type:", obj.dtype
+                          "  ", key, "=",
+                          str(value)[:250],
+                          flush=True
                       )
-                  else:
-                      print("GROEP:", name)
-                  count[0] += 1
-
-              radar.visititems(describe)
-
-          print("Onderzoek voltooid.", flush=True)
           PY
