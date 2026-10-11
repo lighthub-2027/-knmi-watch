@@ -139,6 +139,19 @@ def render(created, values):
     d.text((right, 131), "+2 UUR", font=font(17), fill=muted, anchor="ra")
     img.save(OUT / "rain.png", optimize=True)
 
+def rain_text(values):
+    """Twaalf blokjes van elk circa tien minuten, uit KNMI-waarden."""
+    levels = "▁▂▃▄▅▆▇█"
+    buckets = []
+    for i in range(0, min(24, len(values)), 2):
+        samples = [mm for _, mm in values[i:i + 2] if mm is not None]
+        buckets.append(max(samples) if samples else None)
+    finite = [v for v in buckets if v is not None]
+    if not finite:
+        return "Geen KNMI-data"
+    scale = max(1.0, max(finite))
+    bars = "".join("?" if v is None else "·" if v <= 0 else levels[min(7, max(0, round(v / scale * 7)))] for v in buckets)
+    return f"NU {bars} +2u"
 
 def main():
     created, values = fetch_values()
@@ -149,6 +162,7 @@ def main():
     url = f"https://lighthub-2027.github.io/-knmi-watch/rain.png?v={stamp}"
     payload = {
         "image_url": url,
+        "regenbalkjes": rain_text(values),
         "location": "Vlambloemlaan, Vleuterweide",
         "source": "KNMI radar_forecast/2.0",
         "updated_at": created.isoformat(),
