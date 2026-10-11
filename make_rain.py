@@ -186,6 +186,7 @@ def main():
     payload = {
         "image_url": url,
         "regenbalkjes": rain_text(values, created),
+        "Regen": rain_text(values, created),
         "location": "Vlambloemlaan, Vleuterweide",
         "source": "KNMI radar_forecast/2.0",
         "updated_at": created.isoformat(),
