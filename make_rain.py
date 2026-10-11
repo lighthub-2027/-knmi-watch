@@ -160,7 +160,7 @@ def rain_text(values, created):
         return levels[level]
 
     bars = "".join(symbol(mm) for mm in future)
-    return bars[:18]
+    return bars[:20]
 
     first_rain = next(
         (i for i, mm in enumerate(future)
