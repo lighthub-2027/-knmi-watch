@@ -17,4 +17,3 @@ jobs:
             "https://api.dataplatform.knmi.nl/open-data/v1/datasets/radar_forecast/versions/2.0/files?maxKeys=1"
 
           echo "KNMI regenverwachting bereikbaar"
-
