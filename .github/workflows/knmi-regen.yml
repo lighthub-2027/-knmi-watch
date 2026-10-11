@@ -8,12 +8,13 @@ jobs:
   controle:
     runs-on: ubuntu-latest
     steps:
-      - name: Controleer KNMI sleutel
+      - name: Test verbinding met KNMI
         env:
           KNMI_API_KEY: ${{ secrets.KNMI_API_KEY }}
         run: |
-          if [ -z "$KNMI_API_KEY" ]; then
-            echo "KNMI sleutel ontbreekt"
-            exit 1
-          fi
-          echo "KNMI sleutel is ingesteld"
+          curl --fail --silent --show-error \
+            --header "Authorization: $KNMI_API_KEY" \
+            "https://api.dataplatform.knmi.nl/open-data/v1/datasets/10-minute-in-situ-meteorological-observations/versions/1.0/files?maxKeys=1" \
+            --output /dev/null
+
+          echo "Verbinding met KNMI geslaagd"
