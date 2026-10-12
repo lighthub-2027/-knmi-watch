@@ -160,7 +160,7 @@ def rain_text(values, created):
         return levels[level]
 
     bars = "".join(symbol(mm) for mm in future)
-    return bars[:20]
+        return now.astimezone(TZ).strftime("%H:%M") + bars[:15]
 
     first_rain = next(
         (i for i, mm in enumerate(future)
