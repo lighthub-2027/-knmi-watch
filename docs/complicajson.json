@@ -1,9 +1,9 @@
 {
-  "image_url": "https://lighthub-2027.github.io/-knmi-watch/rain.png?v=1792469364",
-  "regenbalkjes": "06:13•••••••••••••••",
-  "Regen": "06:13•••••••••••••••",
+  "image_url": "https://lighthub-2027.github.io/-knmi-watch/rain.png?v=1792471020",
+  "regenbalkjes": "06:40•••••••••••••••",
+  "Regen": "06:40•••••••••••••••",
   "location": "Vlambloemlaan, Vleuterweide",
   "source": "KNMI radar_forecast/2.0",
-  "updated_at": "2026-10-20T04:09:24+00:00",
-  "updated_local": "20-10-2026 06:09 CEST"
+  "updated_at": "2026-10-20T04:37:00+00:00",
+  "updated_local": "20-10-2026 06:37 CEST"
 }
